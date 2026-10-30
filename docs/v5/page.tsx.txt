@@ -1,0 +1,986 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
+import Lenis from "lenis";
+import Logo from "./Logo";
+import Quiz from "./Quiz";
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+const PHONE = "919580824464";
+const PHONE_SHOWN = "+91 95808 24464";
+const ADDRESS =
+  "1420/37A, Khadepur Chauraha, near Kameshwar Mandir, Hanumant Vihar, Naubasta, Kanpur, Uttar Pradesh 208021";
+const MAPS = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+  "The Muscle Paradise, 1420/37A Khadepur Chauraha, Hanumant Vihar, Naubasta, Kanpur 208021",
+)}`;
+const INSTAGRAM = "https://www.instagram.com/the_muscleparadise/";
+const wa = (text: string) =>
+  `https://wa.me/${PHONE}?text=${encodeURIComponent(text)}`;
+
+// Real photos live in public/photos (see docs/PLAN.md for which file is which).
+const heroSlides = ["backstage", "pose-back", "abs", "squad"];
+
+const floors = [
+  {
+    id: "cardio",
+    level: "1st floor",
+    name: "Cardio",
+    line: "Up the stairs, behind the glass front. Treadmills facing the trees.",
+    kit: ["Treadmills along the glass", "Spin bikes", "Cross-trainers", "Stretching space"],
+  },
+  {
+    id: "iron",
+    level: "Ground floor",
+    name: "Iron",
+    line: "Racks, plates and machines. The floor where physiques get built.",
+    kit: ["Power racks & Smith", "Plate-loaded machines", "Cable crossover", "Dumbbells & benches"],
+  },
+];
+
+const reel = [
+  { clip: "hero", word: "Lift", line: "Racks, plates, machines. Load it up." },
+  { clip: "battle", word: "Sweat", line: "A whole floor for cardio when you need to empty the tank." },
+  { clip: "press", word: "Push", line: "Coaches on the floor every shift, watching every rep." },
+  { clip: "pullup", word: "Repeat", line: "Open 5 AM to 11 PM. Show up tomorrow. And the day after." },
+];
+
+const programs = [
+  { img: "ropes", name: "Fat loss", note: "Conditioning and a diet chart that fits Indian food", len: "12 weeks" },
+  { img: "curl", name: "Muscle gain", note: "Hypertrophy split, progress checked every week", len: "16 weeks" },
+  { img: "back", name: "Contest prep", note: "Posing practice, peak week, stage-day plan", len: "Show-ready" },
+  { img: "trainer", name: "Personal training", note: "One coach, one plan, just you", len: "1 : 1" },
+  { img: "her-press", name: "Strength for women", note: "Same floor, same racks, a plan built for you", len: "10 weeks" },
+  { img: "kettle", name: "Beginners & 40+", note: "Form first, ego never", len: "8 weeks" },
+];
+
+const coaches = [
+  { img: "coach1", name: "Vikram Yadav", role: "Head coach, contest prep", yrs: 11 },
+  { img: "coach2", name: "Neha Tiwari", role: "Strength coach", yrs: 7 },
+  { img: "coach3", name: "Arjun Mishra", role: "Fat loss, conditioning", yrs: 6 },
+  { img: "coach4", name: "Sana Qureshi", role: "Mobility, rehab", yrs: 8 },
+];
+
+const stories = [
+  { stat: "−21 kg", who: "Rohit, 34, bank clerk", quote: "I joined after my BP report scared me. Eight months later my doctor asked what I'd changed." },
+  { stat: "+9 kg", who: "Aman, 22, student", quote: "Skinny my whole life. Coach didn't let me skip a single leg day. Hated him. Now I get it." },
+  { stat: "Stage", who: "Imran, 27, first show", quote: "Never thought I'd stand on a stage in trunks. The whole gym came to watch." },
+];
+
+// Each plan is a plate: longer commitment, heavier plate.
+const plans = [
+  { name: "Monthly", months: 1, kg: 10, color: "green", price: 1499, note: "Try us out" },
+  { name: "Quarterly", months: 3, kg: 15, color: "yellow", price: 3999, note: "Save ₹498" },
+  { name: "Half-yearly", months: 6, kg: 20, color: "blue", price: 6999, note: "Save ₹1,995" },
+  { name: "Yearly", months: 12, kg: 25, color: "red", price: 11999, note: "₹33 a day. Less than your chai and samosa." },
+];
+
+// Typical members on the floor by hour (from biometric logs, once connected).
+const crowd = [0, 0, 0, 0, 0, 38, 62, 71, 55, 34, 22, 18, 15, 14, 16, 24, 41, 66, 74, 63, 45, 28, 12, 0];
+
+// DEMO ONLY: recent activity popups. Before launch this must come from real
+// sign-ups / bookings (fake activity is misleading and against consumer rules).
+const activity = [
+  "Ankit from Naubasta booked a free session",
+  "Priya from Hanumant Vihar joined Quarterly",
+  "Rohan & Simran from Yashoda Nagar joined as a couple",
+  "Faizan from Kidwai Nagar booked a free session",
+  "Neha from Barra joined Half-yearly",
+  "Kartik from Kidwai Nagar started contest prep",
+];
+
+const inr = (n: number) => "₹" + n.toLocaleString("en-IN");
+
+const words = (s: string) =>
+  s.split(" ").map((w, i) => (
+    <span className="mw" key={i}>
+      {w}{" "}
+    </span>
+  ));
+
+const splitWords = (s: string) =>
+  s.split(" ").map((w, i) => (
+    <span className="w" key={i}>
+      <span>{w}&nbsp;</span>
+    </span>
+  ));
+
+export default function Home() {
+  const main = useRef<HTMLElement>(null);
+  const preview = useRef<HTMLDivElement>(null);
+  const cursor = useRef<HTMLDivElement>(null);
+  const hold = useRef<HTMLButtonElement>(null);
+  const holdTween = useRef<gsap.core.Tween | null>(null);
+  const reelVideos = useRef<(HTMLVideoElement | null)[]>([]);
+  const [now, setNow] = useState<Date | null>(null);
+  const [slide, setSlide] = useState(0);
+  const [floor, setFloor] = useState(0);
+  const [hovered, setHovered] = useState(-1);
+  const [active, setActive] = useState(0);
+  const [join, setJoin] = useState<(typeof plans)[number] | null>(null);
+  const [memberId, setMemberId] = useState("");
+  const [toast, setToast] = useState(-1);
+
+  useEffect(() => {
+    const update = () => setNow(new Date());
+    const t = setTimeout(update);
+    const id = setInterval(update, 30000);
+    const s = setInterval(() => setSlide((x) => (x + 1) % heroSlides.length), 4000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(id);
+      clearInterval(s);
+    };
+  }, []);
+
+  // One activity popup every ~12s, visible for 5s.
+  useEffect(() => {
+    let i = 0;
+    let hide: ReturnType<typeof setTimeout>;
+    const show = () => {
+      setToast(i++ % activity.length);
+      hide = setTimeout(() => setToast(-1), 5000);
+    };
+    const first = setTimeout(show, 9000);
+    const id = setInterval(show, 12000);
+    return () => {
+      clearTimeout(first);
+      clearTimeout(hide);
+      clearInterval(id);
+    };
+  }, []);
+
+  // Only the visible reel clip plays.
+  useEffect(() => {
+    reelVideos.current.forEach((v, i) => {
+      if (!v) return;
+      if (i === active) v.play().catch(() => {});
+      else v.pause();
+    });
+  }, [active]);
+
+  const ist = now ? new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })) : null;
+  const hour = ist?.getHours() ?? 18;
+  const open = hour >= 5 && hour < 23;
+  const onFloor = crowd[hour];
+  const mood = !open ? "Closed" : onFloor < 25 ? "Quiet" : onFloor < 55 ? "Steady" : "Busy";
+
+  // Joining fee waived until the end of this month (IST).
+  const deadline = ist ? new Date(ist.getFullYear(), ist.getMonth() + 1, 0, 23, 59) : null;
+  const left = deadline && ist ? deadline.getTime() - ist.getTime() : 0;
+  const leftText = `${Math.floor(left / 864e5)}d ${Math.floor((left / 36e5) % 24)}h ${Math.floor((left / 6e4) % 60)}m`;
+  const monthEnd = deadline?.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+
+  const openPlan = (name: string) => {
+    setMemberId("");
+    setJoin(plans.find((p) => p.name === name) ?? plans[1]);
+  };
+
+  // "Hold to start": press and hold like a deadlift grip.
+  const startHold = () => {
+    holdTween.current?.kill();
+    holdTween.current = gsap.to(hold.current, {
+      "--p": 1,
+      duration: 1.4,
+      ease: "power1.in",
+      onComplete: () => {
+        navigator.vibrate?.(40);
+        gsap.set(hold.current, { "--p": 0 });
+        openPlan("Quarterly");
+      },
+    });
+  };
+  const stopHold = () => {
+    holdTween.current?.kill();
+    gsap.to(hold.current, { "--p": 0, duration: 0.4, ease: "power2.out" });
+  };
+
+  useGSAP(
+    () => {
+      const lenis = new Lenis();
+      lenis.on("scroll", ScrollTrigger.update);
+      const tick = (t: number) => lenis.raf(t * 1000);
+      gsap.ticker.add(tick);
+      gsap.ticker.lagSmoothing(0);
+
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(".loader", { autoAlpha: 0 });
+        gsap.set(".nav, .mobile-bar, .side-stack", { autoAlpha: 1 });
+      });
+
+      mm.add({ desktop: "(min-width: 900px)", motion: "(prefers-reduced-motion: no-preference)" }, (ctx) => {
+        const { desktop, motion } = ctx.conditions!;
+        if (!motion) return;
+
+        // ---- Opening: the kettlebell sign switches on, like the one outside the gym at night.
+        lenis.stop();
+        const counter = { v: 0 };
+        const countEl = document.querySelector(".loader-count");
+        gsap
+          .timeline({
+            onComplete: () => {
+              lenis.start();
+              ScrollTrigger.refresh();
+            },
+          })
+          .to(counter, {
+            v: 100,
+            duration: 2.2,
+            ease: "power2.inOut",
+            onUpdate: () => {
+              if (countEl) countEl.textContent = String(Math.round(counter.v)).padStart(3, "0");
+            },
+          })
+          .to(
+            ".loader-sign",
+            {
+              keyframes: [
+                { opacity: 1, duration: 0.05 },
+                { opacity: 0.25, duration: 0.09 },
+                { opacity: 1, duration: 0.05 },
+                { opacity: 0.4, duration: 0.14 },
+                { opacity: 1, duration: 0.08 },
+                { opacity: 0.6, duration: 0.05 },
+                { opacity: 1, duration: 0.3 },
+              ],
+            },
+            0.5,
+          )
+          .from(".loader-line > span", { yPercent: 110, duration: 0.9, ease: "expo.out" }, 0.9)
+          .to(".loader", { clipPath: "inset(0% 0% 100% 0%)", duration: 1.1, ease: "expo.inOut" }, 2.4)
+          .set(".loader", { autoAlpha: 0 })
+          .set(".nav, .mobile-bar", { autoAlpha: 1 }, 2.9)
+          .from(".hero-frame", { clipPath: "inset(100% 0% 0% 0%)", duration: 1.4, ease: "expo.inOut" }, 2.6)
+          .from(".hero-frame img", { scale: 1.35, duration: 2, ease: "expo.out" }, 2.6)
+          .from(".hero-title .ch", { yPercent: 110, duration: 1.2, ease: "expo.out", stagger: 0.03 }, 2.9)
+          .from(".hero-fade", { opacity: 0, y: 16, duration: 1, ease: "power3.out", stagger: 0.07 }, 3.3)
+          .from(".nav", { y: -16, opacity: 0, duration: 0.8, ease: "power3.out" }, 3.1);
+
+        // Offer + activity cards only once you're past the hero, so they never cover it.
+        ScrollTrigger.create({
+          trigger: ".hero",
+          start: "bottom 70%",
+          endTrigger: "html",
+          end: "bottom bottom",
+          onToggle: (self) => gsap.to(".side-stack", { autoAlpha: self.isActive ? 1 : 0, duration: 0.4 }),
+        });
+
+        // ---- Hero: photo drifts slower than the page.
+        gsap.to(".hero-frame", {
+          yPercent: 12,
+          ease: "none",
+          scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: true },
+        });
+
+        gsap.fromTo(
+          ".manifesto .mw",
+          { opacity: 0.12 },
+          {
+            opacity: 1,
+            stagger: 0.1,
+            ease: "none",
+            scrollTrigger: { trigger: ".manifesto", start: "top 75%", end: "bottom 55%", scrub: true },
+          },
+        );
+
+        // ---- Reel: pinned, one clip per word.
+        ScrollTrigger.create({
+          trigger: ".reel",
+          start: "top top",
+          end: "+=300%",
+          pin: true,
+          scrub: true,
+          onUpdate: (self) => setActive(Math.min(reel.length - 1, Math.floor(self.progress * reel.length))),
+        });
+        gsap.fromTo(
+          ".reel-frame",
+          { clipPath: "inset(10% 10% 10% 10%)" },
+          {
+            clipPath: "inset(0% 0% 0% 0%)",
+            ease: "none",
+            scrollTrigger: { trigger: ".reel", start: "top bottom", end: "top top", scrub: true },
+          },
+        );
+
+        // ---- Stage photos rise at different speeds.
+        gsap.utils.toArray<HTMLElement>("[data-speed]").forEach((el) =>
+          gsap.to(el, {
+            yPercent: Number(el.dataset.speed),
+            ease: "none",
+            scrollTrigger: { trigger: ".stage", start: "top bottom", end: "bottom top", scrub: true },
+          }),
+        );
+
+        gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((el) =>
+          gsap.from(el, {
+            y: 40,
+            opacity: 0,
+            duration: 1.1,
+            ease: "power3.out",
+            scrollTrigger: { trigger: el, start: "top 90%" },
+          }),
+        );
+        gsap.utils.toArray<HTMLElement>("[data-split]").forEach((el) =>
+          gsap.from(el.querySelectorAll(".w > span"), {
+            yPercent: 110,
+            duration: 1.2,
+            ease: "expo.out",
+            stagger: 0.04,
+            scrollTrigger: { trigger: el, start: "top 88%" },
+          }),
+        );
+        gsap.utils.toArray<HTMLElement>("[data-clip]").forEach((el) =>
+          gsap.fromTo(
+            el,
+            { clipPath: "inset(0% 0% 100% 0%)" },
+            {
+              clipPath: "inset(0% 0% 0% 0%)",
+              duration: 1.4,
+              ease: "expo.inOut",
+              scrollTrigger: { trigger: el, start: "top 85%" },
+            },
+          ),
+        );
+        gsap.from(".hour i", {
+          scaleY: 0,
+          transformOrigin: "bottom",
+          duration: 1,
+          ease: "expo.out",
+          stagger: 0.03,
+          scrollTrigger: { trigger: ".hours", start: "top 85%" },
+        });
+        gsap.from(".plan-plate", {
+          rotation: -120,
+          x: -80,
+          opacity: 0,
+          duration: 1.3,
+          ease: "expo.out",
+          stagger: 0.1,
+          scrollTrigger: { trigger: ".plates", start: "top 80%" },
+        });
+
+        if (desktop) {
+          const cx = gsap.quickTo(cursor.current, "x", { duration: 0.35, ease: "power3" });
+          const cy = gsap.quickTo(cursor.current, "y", { duration: 0.35, ease: "power3" });
+          const px = gsap.quickTo(preview.current, "x", { duration: 0.6, ease: "power3" });
+          const py = gsap.quickTo(preview.current, "y", { duration: 0.6, ease: "power3" });
+          const move = (e: MouseEvent) => {
+            cx(e.clientX);
+            cy(e.clientY);
+            px(e.clientX);
+            py(e.clientY);
+          };
+          const over = (e: MouseEvent) => {
+            const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cursor], a, button");
+            const label = el?.dataset.cursor ?? "";
+            cursor.current?.classList.toggle("big", !!label);
+            cursor.current?.classList.toggle("link", !!el && !label);
+            const text = cursor.current?.querySelector("span");
+            if (text) text.textContent = label;
+          };
+          window.addEventListener("mousemove", move);
+          window.addEventListener("mouseover", over);
+          return () => {
+            window.removeEventListener("mousemove", move);
+            window.removeEventListener("mouseover", over);
+          };
+        }
+      });
+
+      return () => {
+        gsap.ticker.remove(tick);
+        lenis.destroy();
+      };
+    },
+    { scope: main },
+  );
+
+  const f = floors[floor];
+
+  return (
+    <main ref={main}>
+      {/* OPENING */}
+      <div className="loader" aria-hidden>
+        <div className="loader-sign">
+          <Logo />
+        </div>
+        <p className="loader-line">
+          <span>The Muscle Paradise · Date the weight</span>
+        </p>
+        <p className="loader-count">000</p>
+      </div>
+
+      <nav className="nav">
+        <a href="#top" className="logo" aria-label="The Muscle Paradise home">
+          <Logo variant="mark" />
+          The Muscle Paradise
+        </a>
+        <div className="nav-links">
+          <a href="#floors">Floors</a>
+          <a href="#stage">Stage</a>
+          <a href="#programs">Programs</a>
+          <a href="#plans">Membership</a>
+        </div>
+        <div className="nav-right">
+          <span className="status">
+            <i className={open ? "on" : ""} />
+            {ist
+              ? `${open ? "Open now" : "Closed"} · ${ist.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`
+              : "Kanpur"}
+          </span>
+          <a href="#plans" className="btn">
+            Join
+          </a>
+        </div>
+      </nav>
+
+      {/* HERO */}
+      <section className="hero" id="top">
+        <div className="hero-copy">
+          <p className="hero-fade kicker">Unisex gym · Boys &amp; Girls · Naubasta, Kanpur</p>
+          <h1 className="hero-title" aria-label="The Muscle Paradise">
+            {["The Muscle", "Paradise."].map((line) => (
+              <span className="hero-line" key={line} aria-hidden>
+                {line.split("").map((c, i) => (
+                  <span className="ch" key={i}>
+                    {c === " " ? " " : c}
+                  </span>
+                ))}
+              </span>
+            ))}
+          </h1>
+          <p className="hero-fade hero-lede">
+            Two floors. Heavy iron downstairs, cardio upstairs. Men and women training side by side. And members who
+            take it all the way to the stage.
+          </p>
+          <div className="hero-fade hero-actions">
+            <a className="btn big brand" href="#quiz">
+              Get my plan
+            </a>
+            <a className="btn big ghost" href={wa("Hi! I'd like to book my free first session at The Muscle Paradise.")}>
+              Book a free session
+            </a>
+          </div>
+          <dl className="hero-fade hero-facts">
+            <div>
+              <dt>Floors</dt>
+              <dd>2</dd>
+            </div>
+            <div>
+              <dt>Open</dt>
+              <dd>5 AM – 11 PM</dd>
+            </div>
+            <div>
+              <dt>First session</dt>
+              <dd>Free</dd>
+            </div>
+          </dl>
+        </div>
+        <div className="hero-frame" data-cursor="Train">
+          {heroSlides.map((s, i) => (
+            <Image
+              key={s}
+              src={`/photos/${s}.jpg`}
+              alt="A member of The Muscle Paradise"
+              fill
+              preload={i === 0}
+              sizes="(min-width: 900px) 42vw, 100vw"
+              className={i === slide ? "on" : ""}
+            />
+          ))}
+          <p className="frame-tag">
+            <span>Our members</span>
+            <span>
+              0{slide + 1} / 0{heroSlides.length}
+            </span>
+          </p>
+        </div>
+      </section>
+
+      {/* MANIFESTO with inline clips */}
+      <section className="manifesto">
+        <p className="manifesto-text">
+          {words("No juice bar. No mood lighting.")}
+          <span className="pill">
+            <video src="/video/kettle.mp4" autoPlay muted loop playsInline />
+          </span>{" "}
+          {words("Just heavy iron, coaches who learn your name, and a floor where the uncle doing his first push-up gets the same respect as the guy")}
+          <span className="pill">
+            <video src="/video/landmine.mp4" autoPlay muted loop playsInline />
+          </span>{" "}
+          <span className="mw">prepping</span> <span className="mw">for</span> <span className="mw c-brand">stage.</span>
+        </p>
+      </section>
+
+      {/* FLOORS */}
+      <section className="floors" id="floors">
+        <div className="section-head">
+          <p className="eyebrow">Two floors</p>
+          <h2 className="h2" data-split>
+            {splitWords("Iron downstairs. Cardio upstairs.")}
+          </h2>
+        </div>
+        <div className="floors-grid">
+          <div className="building" data-reveal>
+            {floors.map((fl, i) => (
+              <button
+                key={fl.id}
+                className={`storey ${i === floor ? "on" : ""}`}
+                onMouseEnter={() => setFloor(i)}
+                onFocus={() => setFloor(i)}
+                onClick={() => setFloor(i)}
+              >
+                <span className="storey-level">{fl.level}</span>
+                <span className="storey-name">{fl.name}</span>
+                <span className="storey-line">{fl.line}</span>
+                <ul>
+                  {fl.kit.map((k) => (
+                    <li key={k}>{k}</li>
+                  ))}
+                </ul>
+              </button>
+            ))}
+            <p className="building-base">Entry · Khadepur Chauraha</p>
+          </div>
+          <div className="floor-photo" data-reveal>
+            {floors.map((fl, i) => (
+              <Image
+                key={fl.id}
+                src={`/photos/floor-${fl.id}.jpg`}
+                alt={`${fl.name} floor at The Muscle Paradise`}
+                fill
+                sizes="(min-width: 900px) 50vw, 100vw"
+                className={i === floor ? "on" : ""}
+              />
+            ))}
+            <p className="frame-tag">
+              <span>{f.level}</span>
+              <span>{f.name}</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* REEL */}
+      <section className="reel" id="reel">
+        <div className="reel-frame" data-cursor="Train">
+          {reel.map((r, i) => (
+            <video
+              key={r.clip}
+              ref={(el) => {
+                reelVideos.current[i] = el;
+              }}
+              className={i === active ? "on" : ""}
+              src={`/video/${r.clip}.mp4`}
+              poster={`/video/${r.clip}.jpg`}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              autoPlay={i === 0}
+            />
+          ))}
+        </div>
+        <div className="reel-words">
+          {reel.map((r, i) => (
+            <p key={r.word} className={i === active ? "on" : ""}>
+              {r.word}
+            </p>
+          ))}
+        </div>
+        <div className="reel-foot">
+          <p key={active} className="reel-line">
+            {reel[active].line}
+          </p>
+          <p className="reel-count">
+            0{active + 1} / 0{reel.length}
+          </p>
+        </div>
+      </section>
+
+      {/* STAGE */}
+      <section className="stage" id="stage">
+        <div className="stage-copy">
+          <p className="eyebrow">From this floor to the stage</p>
+          <h2 className="h2" data-split>
+            {splitWords("Some come to get fit. Some come to compete.")}
+          </h2>
+          <p className="stage-text" data-reveal>
+            Our members walk on stage at bodybuilding and physique shows. The prep happens right here: posing practice
+            on the floor, peak-week plans, and the whole gym backstage on show day.
+          </p>
+          <ul className="stage-list" data-reveal>
+            <li>Posing coaching</li>
+            <li>Peak week &amp; stage-day diet</li>
+            <li>Off-season building plans</li>
+          </ul>
+          <a
+            className="btn big brand"
+            href={wa("Hi! I want to train for a bodybuilding / physique show. Can we talk about contest prep?")}
+            data-reveal
+          >
+            Train for the stage
+          </a>
+        </div>
+        <div className="stage-photos">
+          <figure className="sp sp-1" data-speed="-10">
+            <Image src="/photos/pose-back.jpg" alt="Member hitting a back pose" fill sizes="(min-width: 900px) 30vw, 60vw" />
+          </figure>
+          <figure className="sp sp-2" data-speed="-22">
+            <Image src="/photos/squad.jpg" alt="Members posing together in the mirror" fill sizes="(min-width: 900px) 24vw, 50vw" />
+          </figure>
+          <figure className="sp sp-3" data-speed="-4">
+            <Image src="/photos/abs.jpg" alt="Member training between sets" fill sizes="(min-width: 900px) 22vw, 50vw" />
+          </figure>
+          <figure className="sp sp-4" data-speed="-16">
+            <Image src="/photos/selfie.jpg" alt="Member after a session" fill sizes="(min-width: 900px) 18vw, 40vw" />
+          </figure>
+        </div>
+      </section>
+
+      <Quiz
+        crowd={crowd}
+        prices={Object.fromEntries(plans.map((p) => [p.name, p.price]))}
+        onJoin={openPlan}
+        wa={wa}
+      />
+
+      {/* PROGRAMS */}
+      <section className="programs" id="programs">
+        <div className="section-head">
+          <p className="eyebrow">Programs</p>
+          <h2 className="h2" data-split>
+            {splitWords("Pick a goal. We'll write the plan.")}
+          </h2>
+        </div>
+        <ul className="program-list" onMouseLeave={() => setHovered(-1)}>
+          {programs.map((p, i) => (
+            <li key={p.name} onMouseEnter={() => setHovered(i)}>
+              <span className="pl-num">0{i + 1}</span>
+              <h3>{p.name}</h3>
+              <p>{p.note}</p>
+              <span className="len">{p.len}</span>
+              <a href={wa(`Hi! I'm interested in the ${p.name} program.`)} aria-label={`Ask about ${p.name}`} data-cursor="Ask">
+                Ask
+              </a>
+            </li>
+          ))}
+        </ul>
+        <div className={`preview ${hovered >= 0 ? "show" : ""}`} ref={preview} aria-hidden>
+          {programs.map((p, i) => (
+            <Image key={p.name} src={`/img/${p.img}.jpg`} alt="" fill sizes="300px" className={i === hovered ? "on" : ""} />
+          ))}
+        </div>
+      </section>
+
+      {/* TOGETHER */}
+      <section className="her">
+        <div className="her-media" data-clip>
+          <video src="/video/her.mp4" poster="/video/her.jpg" autoPlay muted loop playsInline />
+        </div>
+        <div className="her-copy">
+          <p className="eyebrow">Unisex, properly</p>
+          <h2 className="h2" data-split>
+            {splitWords("Boys and girls. Same floor, same respect.")}
+          </h2>
+          <ul>
+            {[
+              ["No separate timings", "train whenever suits you"],
+              ["Every machine, every rack", "open to everyone"],
+              ["Coaches who watch every rep", "whoever's lifting"],
+              ["CCTV on the floor", "never in private areas"],
+              ["Zero tolerance", "for harassment, actually enforced"],
+              ["Couples train together", "and save 15%"],
+            ].map(([a, b]) => (
+              <li key={a} data-reveal>
+                <b>{a}</b> {b}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* COACHES */}
+      <section className="coaches" id="coaches">
+        <div className="section-head">
+          <p className="eyebrow">Coaches</p>
+          <h2 className="h2" data-split>
+            {splitWords("They'll know your name by day two.")}
+          </h2>
+        </div>
+        <div className="coach-grid">
+          {coaches.map((c) => (
+            <article className="coach" key={c.name} data-reveal>
+              <div className="coach-img">
+                <Image src={`/img/${c.img}.jpg`} alt={c.name} fill sizes="(min-width: 900px) 25vw, 50vw" />
+              </div>
+              <h3>{c.name}</h3>
+              <p>
+                {c.role} · {c.yrs} years
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* STORIES */}
+      <section className="stories">
+        <div className="story-grid">
+          {stories.map((s) => (
+            <figure className="story" key={s.who} data-reveal>
+              <p className="stat">{s.stat}</p>
+              <blockquote>“{s.quote}”</blockquote>
+              <figcaption>{s.who}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      {/* LIVE */}
+      <section className="live">
+        <div className="live-head">
+          <p className="eyebrow">
+            Right now · from the fingerprint door <span className="tag">preview</span>
+          </p>
+          <p className="live-num">
+            {open ? onFloor : 0}
+            <span>{mood}</span>
+          </p>
+          <p className="live-copy">
+            {open
+              ? `people across both floors at ${hour}:00. ${mood === "Quiet" ? "Perfect time for squats." : mood === "Steady" ? "Racks are free, go lift." : "Peak hour. Expect to share."}`
+              : "We open at 5 AM. Early birds get the racks."}
+          </p>
+        </div>
+        <div className="hours" aria-label="Typical crowd by hour">
+          {crowd.slice(5, 23).map((c, i) => (
+            <div key={i} className={`hour ${i + 5 === hour ? "now" : ""}`}>
+              <i style={{ height: `${(c / 80) * 100}%` }} />
+              <span>{i + 5}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PLANS — plates */}
+      <section className="plans" id="plans">
+        <div className="section-head">
+          <p className="eyebrow">Membership</p>
+          <h2 className="h2" data-split>
+            {splitWords("Pick your plate. Heavier saves more.")}
+          </h2>
+        </div>
+        <div className="plates">
+          {plans.map((p) => (
+            <div className="plan-col" key={p.name}>
+              <button
+                className={`plan-plate ${p.color}`}
+                style={{ width: `${60 + p.kg * 1.6}%` }}
+                data-cursor="Join"
+                onClick={() => openPlan(p.name)}
+                aria-label={`Join ${p.name} for ${inr(p.price)}`}
+              >
+                <span className="pp-kg">{p.kg}</span>
+                <span className="pp-hole" />
+                <span className="pp-label">{p.months === 1 ? "1 month" : `${p.months} months`}</span>
+              </button>
+              <h3>{p.name}</h3>
+              <p className="price">{inr(p.price)}</p>
+              <p className="plan-note">{p.note}</p>
+              <button className={`btn ${p.months === 12 ? "brand" : "ghost"}`} onClick={() => openPlan(p.name)}>
+                Join {p.name.toLowerCase()}
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className="addons" data-reveal>
+          Personal training ₹4,000 a month · Couples save 15% · Students save 10% with ID · GST invoice with every payment
+        </p>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        <div className="footer-cta">
+          <Logo className="footer-badge" />
+          <h2>Come lift.</h2>
+          <button
+            ref={hold}
+            className="hold"
+            onPointerDown={startHold}
+            onPointerUp={stopHold}
+            onPointerLeave={stopHold}
+            onKeyDown={(e) => e.key === "Enter" && openPlan("Quarterly")}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <svg viewBox="0 0 100 100" aria-hidden>
+              <circle cx="50" cy="50" r="46" />
+              <circle cx="50" cy="50" r="46" className="hold-ring" />
+            </svg>
+            <span>
+              Hold to
+              <br />
+              start
+            </span>
+          </button>
+          <div className="footer-links">
+            <a className="btn big" href={wa("Hi! I'd like to visit The Muscle Paradise.")}>
+              WhatsApp us
+            </a>
+            <a className="btn big ghost" href={MAPS} target="_blank" rel="noreferrer">
+              Get directions
+            </a>
+          </div>
+        </div>
+
+        <div className="find-us">
+          <div className="find-photo" data-clip>
+            <Image
+              src="/photos/storefront.jpg"
+              alt="The Muscle Paradise storefront with the kettlebell sign"
+              fill
+              sizes="(min-width: 900px) 50vw, 100vw"
+            />
+          </div>
+          <div className="find-copy">
+            <p className="eyebrow">Find us</p>
+            <p className="find-big">Look for the kettlebell sign at Khadepur Chauraha.</p>
+            <p>{ADDRESS}</p>
+            <dl>
+              <div>
+                <dt>Hours</dt>
+                <dd>
+                  Mon to Sat, 5 AM to 11 PM
+                  <br />
+                  Sunday, 6 AM to 12 PM
+                </dd>
+              </div>
+              <div>
+                <dt>Call / WhatsApp</dt>
+                <dd>
+                  <a href={`tel:+${PHONE}`}>{PHONE_SHOWN}</a>
+                </dd>
+              </div>
+              <div>
+                <dt>Instagram</dt>
+                <dd>
+                  <a href={INSTAGRAM} target="_blank" rel="noreferrer">
+                    @the_muscleparadise
+                  </a>
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        <div className="footer-base">
+          <span>© {ist?.getFullYear()} The Muscle Paradise, Kanpur · Date the weight</span>
+          <a href="#top">Back to top</a>
+        </div>
+      </footer>
+
+      <a className="wa-float" href={wa("Hi Muscle Paradise!")} aria-label="Chat on WhatsApp">
+        <svg viewBox="0 0 24 24" aria-hidden>
+          <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.8-1.1-4.6-4-4.8-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.3 0 .5l-.3.5-.4.5c-.1.1-.3.3-.1.6.2.3.7 1.2 1.6 1.9 1.1 1 2 1.3 2.3 1.4.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3.1.2.1.7-.1 1.4Z" />
+        </svg>
+      </a>
+
+      {/* Offer + activity (bottom left) */}
+      <div className="side-stack">
+        {toast >= 0 && (
+          <p className="toast" key={toast}>
+            <i />
+            {activity[toast]}
+            <small>just now</small>
+          </p>
+        )}
+        {ist && (
+          <a href="#plans" className="offer">
+            <b>No joining fee</b> if you join by {monthEnd}
+            <span>{leftText} left</span>
+          </a>
+        )}
+      </div>
+
+      {/* Mobile sticky actions */}
+      <div className="mobile-bar">
+        <a className="btn brand" href="#quiz">
+          Get my plan
+        </a>
+        <a className="btn" href={wa("Hi! I'd like to book my free first session at The Muscle Paradise.")}>
+          Free session
+        </a>
+      </div>
+
+      <div className="cursor" ref={cursor} aria-hidden>
+        <span />
+      </div>
+
+      {/* JOIN SHEET */}
+      {join && (
+        <div className="sheet-bg" onClick={() => setJoin(null)} data-lenis-prevent>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal aria-label="Join">
+            <button className="close" onClick={() => setJoin(null)}>
+              Close
+            </button>
+            {!memberId ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setMemberId("MP-" + Math.floor(1000 + Math.random() * 9000));
+                }}
+              >
+                <div className={`sheet-plate ${join.color}`}>{join.kg}</div>
+                <p className="eyebrow">You picked</p>
+                <h3>
+                  {join.name} · {inr(join.price)}
+                </h3>
+                <label>
+                  <span>Full name</span>
+                  <input required name="name" autoComplete="name" />
+                </label>
+                <label>
+                  <span>Mobile</span>
+                  <input
+                    required
+                    name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[6-9][0-9]{9}"
+                    placeholder="10-digit number"
+                  />
+                </label>
+                <label>
+                  <span>Start date</span>
+                  <input required name="start" type="date" />
+                </label>
+                <button className="btn big brand" type="submit">
+                  Pay {inr(join.price)} with UPI
+                </button>
+                <p className="small">UPI, cards, net banking, EMI on yearly. Demo only: Razorpay connects in phase 2.</p>
+              </form>
+            ) : (
+              <div className="done">
+                <div className={`sheet-plate ${join.color} spin`}>{join.kg}</div>
+                <p className="eyebrow">Payment received</p>
+                <h3>You&apos;re in.</h3>
+                <p>
+                  Membership <b>{memberId}</b> is active. Your receipt and GST invoice are on WhatsApp. Put your finger on
+                  the scanner at the door. It already knows you.
+                </p>
+                <button className="btn big" onClick={() => setJoin(null)}>
+                  See you on the floor
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

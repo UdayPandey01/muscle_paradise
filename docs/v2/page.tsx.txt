@@ -1,0 +1,666 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
+import Lenis from "lenis";
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+// Placeholder contact details — swap with the client's real ones.
+const PHONE = "919999999999";
+const PHONE_SHOWN = "99999 99999";
+const ADDRESS = "Swaroop Nagar, Kanpur, U.P. 208002";
+const MAPS = "https://maps.google.com/?q=Muscle+Paradise+Gym+Kanpur";
+const wa = (text: string) =>
+  `https://wa.me/${PHONE}?text=${encodeURIComponent(text)}`;
+
+const rules = [
+  "Re-rack your weights. Your mother isn't coming to do it.",
+  "Mirror selfies after the set, not during.",
+  "Respect everyone on the floor. Everyone.",
+  "Leg day is not optional.",
+  "Wipe the bench. Sweat is personal.",
+];
+const hindiNums = ["१", "२", "३", "४", "५"];
+
+const zones = [
+  { img: "weights", name: "Free weights", spec: "Dumbbells 2.5–50 kg, two full racks", r: -3 },
+  { img: "racks", name: "Strength", spec: "4 power racks · 2 deadlift platforms", r: 2 },
+  { img: "machines", name: "Machines", spec: "Plate-loaded + pin-select, every muscle", r: -1.5 },
+  { img: "cardio", name: "Cardio deck", spec: "Treadmills, bikes, rowers, stair climber", r: 3 },
+  { img: "ropes", name: "Functional", spec: "Turf lane, sleds, ropes, kettlebells", r: -2.5 },
+];
+
+const programs = [
+  { img: "ropes", name: "Lose fat", note: "conditioning + diet chart · 12 weeks" },
+  { img: "curl", name: "Build muscle", note: "hypertrophy split, checked weekly · 16 weeks" },
+  { img: "deadlift", name: "Get strong", note: "squat, bench, deadlift · meet prep" },
+  { img: "trainer", name: "Personal coach", note: "one coach, one plan, just you · 1:1" },
+  { img: "her-press", name: "Women's strength", note: "led by female coaches · 10 weeks" },
+  { img: "kettle", name: "Start from zero", note: "beginners & 40+ · form first, ego never" },
+];
+
+const coaches = [
+  { img: "coach1", name: "Vikram Yadav", role: "Head coach · Powerlifting", since: 2014, r: -2 },
+  { img: "coach2", name: "Neha Tiwari", role: "Women's strength", since: 2018, r: 1.5 },
+  { img: "coach3", name: "Arjun Mishra", role: "Fat loss · Conditioning", since: 2019, r: -1 },
+  { img: "lat", name: "Sana Qureshi", role: "Mobility · Rehab", since: 2017, r: 2.5 },
+];
+
+const stories = [
+  {
+    head: "“Doctor asked what I changed”: bank clerk sheds 21 kg",
+    body: "Rohit (34) walked in after a scary BP report. Eight months, four mornings a week, and one very strict diet chart later, his doctor wanted to know his secret.",
+    r: -1.5,
+  },
+  {
+    head: "Skinny student adds 9 kg, finally forgives coach for leg day",
+    body: "Aman (22) says he hated his coach for the first two months. “Didn't let me skip a single leg day. Now I get it.”",
+    r: 1,
+  },
+  {
+    head: "Teacher pulls 100 kg, whole gym stops to clap",
+    body: "Priya (29) started with the empty bar. Last month she pulled a hundred kilos. “Everyone on the floor clapped. I almost cried.”",
+    r: -0.5,
+  },
+];
+
+const plans = [
+  { name: "Monthly", months: 1, price: 1499, note: "" },
+  { name: "Quarterly", months: 3, price: 3999, note: "save ₹498" },
+  { name: "Half-yearly", months: 6, price: 6999, note: "save ₹1,995" },
+  { name: "Yearly", months: 12, price: 11999, note: "just ₹33 a day", best: true },
+];
+
+// Typical members on the floor by hour (from biometric logs, once connected).
+const crowd = [0, 0, 0, 0, 0, 38, 62, 71, 55, 34, 22, 18, 15, 14, 16, 24, 41, 66, 74, 63, 45, 28, 12, 0];
+
+const inr = (n: number) => "₹" + n.toLocaleString("en-IN");
+
+export default function Home() {
+  const main = useRef<HTMLElement>(null);
+  const [now, setNow] = useState<Date | null>(null);
+  const [goal, setGoal] = useState(0);
+  const [join, setJoin] = useState<(typeof plans)[number] | null>(null);
+  const [member, setMember] = useState<{ id: string; name: string; till: string } | null>(null);
+
+  useEffect(() => {
+    const update = () => setNow(new Date());
+    const t = setTimeout(update);
+    const id = setInterval(update, 30000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(id);
+    };
+  }, []);
+
+  const ist = now
+    ? new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }))
+    : null;
+  const hour = ist?.getHours() ?? 18;
+  const open = hour >= 5 && hour < 23;
+  const onFloor = crowd[hour];
+  const advice = !open
+    ? "Closed now. Shutter goes up at 5 AM."
+    : onFloor < 25
+      ? "Khaali hai! Perfect time for squats."
+      : onFloor < 55
+        ? "Theek-thaak crowd. Racks are free."
+        : "Bheed hai. Come after 9 if you can.";
+
+  useGSAP(
+    () => {
+      const lenis = new Lenis();
+      lenis.on("scroll", ScrollTrigger.update);
+      const tick = (t: number) => lenis.raf(t * 1000);
+      gsap.ticker.add(tick);
+      gsap.ticker.lagSmoothing(0);
+
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const intro = gsap.timeline({ defaults: { ease: "expo.out" } });
+        intro
+          .from(".board", { y: 40, opacity: 0, duration: 1.2 })
+          .from(".sign-line", { yPercent: 100, opacity: 0, duration: 1.1, stagger: 0.12 }, "-=0.8")
+          .from(".arch", { y: 120, opacity: 0, duration: 1.4, stagger: 0.1 }, "-=1")
+          .from(".board-strip span", { opacity: 0, y: 10, duration: 0.6, stagger: 0.05 }, "-=0.9")
+          .from(".hero-note", { clipPath: "inset(0 100% 0 0)", duration: 1.4, ease: "power2.inOut" }, "-=0.4");
+
+        gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((el) =>
+          gsap.from(el, {
+            y: 50,
+            opacity: 0,
+            duration: 1.1,
+            ease: "power3.out",
+            scrollTrigger: { trigger: el, start: "top 90%" },
+          }),
+        );
+        gsap.utils.toArray<HTMLElement>("[data-drop]").forEach((el, i) =>
+          gsap.from(el, {
+            y: -60,
+            rotation: i % 2 ? 10 : -10,
+            opacity: 0,
+            duration: 1.2,
+            ease: "back.out(1.4)",
+            scrollTrigger: { trigger: el, start: "top 92%" },
+          }),
+        );
+        gsap.utils.toArray<HTMLElement>("[data-stamp]").forEach((el) =>
+          gsap.from(el, {
+            scale: 2.6,
+            opacity: 0,
+            duration: 0.45,
+            ease: "back.out(2.2)",
+            scrollTrigger: { trigger: el, start: "top 85%" },
+          }),
+        );
+        gsap.utils.toArray<HTMLElement>("[data-write]").forEach((el) =>
+          gsap.from(el, {
+            clipPath: "inset(0 100% 0 0)",
+            duration: 1.4,
+            ease: "power2.inOut",
+            scrollTrigger: { trigger: el, start: "top 88%" },
+          }),
+        );
+        gsap.from(".tally", {
+          scaleY: 0,
+          transformOrigin: "bottom",
+          duration: 0.9,
+          ease: "power3.out",
+          stagger: 0.04,
+          scrollTrigger: { trigger: ".tallies", start: "top 85%" },
+        });
+        gsap.to(".arch img", {
+          yPercent: 8,
+          ease: "none",
+          scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: true },
+        });
+      });
+
+      return () => {
+        gsap.ticker.remove(tick);
+        lenis.destroy();
+      };
+    },
+    { scope: main },
+  );
+
+  return (
+    <main ref={main}>
+      <nav className="nav">
+        <a href="#top" className="stamp-logo" aria-label="Muscle Paradise home">
+          <svg viewBox="0 0 100 100" aria-hidden>
+            <defs>
+              <path id="ring" d="M50,50 m-38,0 a38,38 0 1,1 76,0 a38,38 0 1,1 -76,0" />
+            </defs>
+            <circle cx="50" cy="50" r="47" />
+            <circle cx="50" cy="50" r="29" />
+            <text>
+              <textPath href="#ring">MUSCLE PARADISE • KANPUR • UNISEX GYM •</textPath>
+            </text>
+          </svg>
+          <b>MP</b>
+        </a>
+        <div className="nav-links">
+          <a href="#floor">The floor</a>
+          <a href="#goals">Programs</a>
+          <a href="#staff">Coaches</a>
+          <a href="#rates">Rates</a>
+        </div>
+        <div className="nav-right">
+          <span className={`door-sign ${open ? "" : "closed"}`}>{ist ? (open ? "Open" : "Closed") : "Open"}</span>
+          <a href="#rates" className="btn">
+            Join now
+          </a>
+        </div>
+      </nav>
+
+      {/* HERO — the painted signboard */}
+      <section className="hero" id="top">
+        <div className="board">
+          <div className="arch left">
+            <Image src="/img/back.jpg" alt="Bodybuilder flexing his back" fill preload sizes="(min-width: 900px) 22vw, 45vw" />
+          </div>
+          <div className="sign">
+            <p className="sign-line board-top">यूनिसेक्स जिम &nbsp;✦&nbsp; Unisex Gym &nbsp;✦&nbsp; Fully A/C</p>
+            <h1>
+              <span className="sign-line">Muscle</span>
+              <span className="sign-line">Paradise</span>
+            </h1>
+            <p className="sign-line sign-hi" lang="hi">
+              मसल पैराडाइज़
+            </p>
+          </div>
+          <div className="arch right">
+            <Image src="/img/her-flex.jpg" alt="Woman flexing her arms" fill preload sizes="(min-width: 900px) 22vw, 45vw" />
+          </div>
+          <div className="board-strip">
+            <span>5 AM – 11 PM</span>
+            <span>Ladies batch</span>
+            <span>Steam</span>
+            <span>Parking</span>
+            <span>Diet charts</span>
+            <a href={`tel:+${PHONE}`}>☎ {PHONE_SHOWN}</a>
+          </div>
+        </div>
+        <div className="hero-below">
+          <p className="lede">
+            Kanpur&apos;s gym for people who actually want to lift. Heavy iron, coaches who watch your form, and a floor
+            where everyone gets respect.
+          </p>
+          <a className="hero-note" href={wa("Hi! I'd like to book my free first session at Muscle Paradise.")}>
+            First session free — bas aa jao! <span>→</span>
+          </a>
+        </div>
+      </section>
+
+      {/* HOUSE RULES — painted wall board */}
+      <section className="rules">
+        <div className="rules-board" data-reveal>
+          <div className="rules-head">
+            <h2 lang="hi">नियम</h2>
+            <p>House rules · painted on our wall since day one</p>
+          </div>
+          <ol>
+            {rules.map((r, i) => (
+              <li key={r}>
+                <span lang="hi">{hindiNums[i]}</span>
+                {r}
+              </li>
+            ))}
+          </ol>
+          <p className="rules-sign">— Management</p>
+        </div>
+      </section>
+
+      {/* FLOOR — prints pinned to the wall */}
+      <section className="floor" id="floor">
+        <div className="head">
+          <p className="kicker">The floor</p>
+          <h2 className="title" data-reveal>
+            6,000 sq ft. <em>Nobody waits.</em>
+          </h2>
+          <p className="muted" data-reveal>
+            Five zones laid out so your workout flows. Here&apos;s a quick tour before you come see it yourself.
+          </p>
+        </div>
+        <div className="prints">
+          {zones.map((z) => (
+            <figure className="print" key={z.name} data-drop style={{ rotate: `${z.r}deg` }}>
+              <i className="tape" />
+              <div className="print-img">
+                <Image src={`/img/${z.img}.jpg`} alt={z.name} fill sizes="(min-width: 900px) 30vw, 90vw" />
+              </div>
+              <figcaption>
+                <b>{z.name}</b>
+                <span>{z.spec}</span>
+              </figcaption>
+            </figure>
+          ))}
+          <p className="scribble" data-write>
+            ← come see it in person!
+          </p>
+        </div>
+      </section>
+
+      {/* PROGRAMS — tick your goal */}
+      <section className="goals" id="goals">
+        <div className="head">
+          <p className="kicker">Programs</p>
+          <h2 className="title" data-reveal>
+            Tick your goal. <em>We&apos;ll write the plan.</em>
+          </h2>
+        </div>
+        <div className="goals-grid">
+          <ul className="goal-list">
+            {programs.map((p, i) => (
+              <li key={p.name} className={i === goal ? "on" : ""} onMouseEnter={() => setGoal(i)} data-reveal>
+                <a href={wa(`Hi! I want to ${p.name.toLowerCase()}. Which program should I join?`)} onFocus={() => setGoal(i)}>
+                  <span className="box" aria-hidden>
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 13 L10 19 L21 4" />
+                    </svg>
+                  </span>
+                  <span className="goal-name">{p.name}</span>
+                  <span className="goal-note">{p.note}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          <figure className="print goal-print" style={{ rotate: "2deg" }} data-reveal>
+            <i className="tape" />
+            <div className="print-img">
+              {programs.map((p, i) => (
+                <Image key={p.name} src={`/img/${p.img}.jpg`} alt="" fill sizes="(min-width: 900px) 32vw, 90vw" className={i === goal ? "on" : ""} />
+              ))}
+            </div>
+            <figcaption>
+              <b>{programs[goal].name}</b>
+              <span>tap to ask a coach on WhatsApp</span>
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      {/* WOMEN — printed notice */}
+      <section className="notice-wrap">
+        <div className="notice" data-reveal>
+          <p className="notice-head">
+            <span lang="hi">सूचना</span> Notice for our women members
+          </p>
+          <h2 className="title">
+            Unisex doesn&apos;t mean <em>an afterthought.</em>
+          </h2>
+          <ul>
+            <li>Female coaches on every shift</li>
+            <li>Separate changing rooms and lockers</li>
+            <li>Ladies-only batch, 11 AM – 12 PM daily</li>
+            <li>CCTV on the floor — never in the rooms</li>
+            <li>Zero-tolerance policy. Actually enforced.</li>
+          </ul>
+          <div className="stamp" data-stamp>
+            Ladies batch
+            <b>11 – 12</b>
+            daily
+          </div>
+        </div>
+        <div className="notice-photo print" data-drop style={{ rotate: "-3deg" }}>
+          <i className="tape" />
+          <div className="print-img tall">
+            <Image src="/img/her-squat.jpg" alt="Woman squatting a loaded barbell" fill sizes="(min-width: 900px) 30vw, 90vw" />
+          </div>
+        </div>
+      </section>
+
+      {/* COACHES — staff ID cards */}
+      <section className="staff" id="staff">
+        <div className="head">
+          <p className="kicker">Coaches</p>
+          <h2 className="title" data-reveal>
+            They&apos;ll know your name <em>by day two.</em>
+          </h2>
+        </div>
+        <div className="ids">
+          {coaches.map((c) => (
+            <article className="id-card" key={c.name} data-drop style={{ rotate: `${c.r}deg` }}>
+              <i className="slot" />
+              <p className="id-band">Muscle Paradise · Staff</p>
+              <div className="id-body">
+                <div className="id-photo">
+                  <Image src={`/img/${c.img}.jpg`} alt={c.name} fill sizes="160px" />
+                </div>
+                <div>
+                  <h3>{c.name}</h3>
+                  <p>{c.role}</p>
+                  <dl>
+                    <dt>Since</dt>
+                    <dd>{c.since}</dd>
+                    <dt>Shift</dt>
+                    <dd>{c.since % 2 ? "Evening" : "Morning"}</dd>
+                  </dl>
+                </div>
+              </div>
+              <p className="id-sign">{c.name.split(" ")[0]}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* STORIES — newspaper clippings */}
+      <section className="press">
+        <div className="head">
+          <p className="kicker">Real members</p>
+          <h2 className="title" data-reveal>
+            Made the <em>local news.</em> (Well, almost.)
+          </h2>
+        </div>
+        <div className="clips">
+          {stories.map((s) => (
+            <article className="clip" key={s.head} data-drop style={{ rotate: `${s.r}deg` }}>
+              <p className="clip-paper">The Kanpur Lifter · Page 3</p>
+              <h3>{s.head}</h3>
+              <p>
+                <b>KANPUR:</b> {s.body}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* LIVE — attendance register */}
+      <section className="register-wrap">
+        <div className="register" data-reveal>
+          <div className="reg-left">
+            <p className="reg-head">
+              Attendance register · {ist ? ist.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "today"}
+            </p>
+            <p className="reg-label">On the floor right now</p>
+            <p className="reg-num" data-write>
+              {open ? onFloor : "0"} <span>log</span>
+            </p>
+            <p className="reg-advice" data-write>
+              {advice}
+            </p>
+            <p className="reg-small">Counted live from the fingerprint machine at the door · preview</p>
+          </div>
+          <div className="tallies" aria-label="Typical crowd by hour">
+            {crowd.slice(5, 23).map((c, i) => (
+              <div key={i} className={`tally-col ${i + 5 === hour ? "now" : ""}`}>
+                <div className="tally" style={{ height: `${(c / 80) * 100}%` }} />
+                <span>{i + 5}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* RATES — rate list */}
+      <section className="rates" id="rates">
+        <div className="rate-card" data-reveal>
+          <div className="rate-top">
+            <h2>
+              <span lang="hi">दर सूची</span>
+              Rate list
+            </h2>
+            <p>All prices include GST · Pay by UPI, card or cash</p>
+          </div>
+          <ul>
+            {plans.map((p) => (
+              <li key={p.name} className={p.best ? "best" : ""}>
+                <button
+                  onClick={() => {
+                    setMember(null);
+                    setJoin(p);
+                  }}
+                >
+                  <span className="rate-name">
+                    {p.name}
+                    {p.note && <small>{p.note}</small>}
+                  </span>
+                  <span className="dots" />
+                  <span className="rate-price">{inr(p.price)}</span>
+                  <span className="rate-go">Join →</span>
+                </button>
+                {p.best && (
+                  <span className="best-note" data-write>
+                    best deal! ↙
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <ul className="extras">
+            <li>
+              <span>Personal training add-on</span>
+              <span className="dots" />
+              <span>₹4,000 / mo</span>
+            </li>
+            <li>
+              <span>Couples (both join together)</span>
+              <span className="dots" />
+              <span>15% off</span>
+            </li>
+            <li>
+              <span>Students with college ID</span>
+              <span className="dots" />
+              <span>10% off</span>
+            </li>
+          </ul>
+          <div className="stamp red" data-stamp>
+            First
+            <b>Free</b>
+            session
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER — the small signboard */}
+      <footer className="footer">
+        <div className="foot-board">
+          <div>
+            <p className="foot-kicker">Stop scrolling.</p>
+            <h2>Come lift.</h2>
+          </div>
+          <div className="foot-actions">
+            <a className="btn big" href={wa("Hi! I'd like to visit Muscle Paradise.")}>
+              WhatsApp us
+            </a>
+            <a className="btn big ghost" href={MAPS} target="_blank" rel="noreferrer">
+              Get directions
+            </a>
+          </div>
+        </div>
+        <div className="foot-info">
+          <div>
+            <p className="kicker">Address</p>
+            <p>{ADDRESS}</p>
+          </div>
+          <div>
+            <p className="kicker">Timings</p>
+            <p>
+              Mon – Sat · 5 AM – 11 PM
+              <br />
+              Sunday · 6 AM – 12 PM
+            </p>
+          </div>
+          <div>
+            <p className="kicker">Call / WhatsApp</p>
+            <p>
+              <a href={`tel:+${PHONE}`}>+91 {PHONE_SHOWN}</a>
+              <br />
+              <a href="https://instagram.com" target="_blank" rel="noreferrer">
+                Instagram
+              </a>
+            </p>
+          </div>
+        </div>
+        <p className="foot-hindi" lang="hi" aria-hidden>
+          दम लगा के।
+        </p>
+        <p className="foot-base">
+          © {ist?.getFullYear()} Muscle Paradise, Kanpur · Made with sweat
+        </p>
+      </footer>
+
+      <a className="wa-float" href={wa("Hi Muscle Paradise!")} aria-label="Chat on WhatsApp">
+        WhatsApp
+      </a>
+
+      {/* JOIN — membership form, then the card */}
+      {join && (
+        <div className="sheet-bg" onClick={() => setJoin(null)} data-lenis-prevent>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal aria-label="Membership form">
+            <button className="close" onClick={() => setJoin(null)}>
+              Close ✕
+            </button>
+            {!member ? (
+              <form
+                className="form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  const till = new Date(String(f.get("start")));
+                  till.setMonth(till.getMonth() + join.months);
+                  setMember({
+                    id: String(Math.floor(1000 + Math.random() * 9000)),
+                    name: String(f.get("name")),
+                    till: till.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+                  });
+                }}
+              >
+                <p className="form-head">
+                  <span lang="hi">सदस्यता फ़ॉर्म</span> Membership form
+                </p>
+                <p className="form-plan">
+                  {join.name} plan <b>{inr(join.price)}</b>
+                </p>
+                <label>
+                  <span>1. Full name</span>
+                  <input required name="name" autoComplete="name" />
+                </label>
+                <label>
+                  <span>2. Mobile number</span>
+                  <input
+                    required
+                    name="phone"
+                    className="boxes"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    pattern="[6-9][0-9]{9}"
+                  />
+                </label>
+                <label>
+                  <span>3. Start date</span>
+                  <input required name="start" type="date" />
+                </label>
+                <button className="btn big pay" type="submit">
+                  Pay {inr(join.price)} by UPI →
+                </button>
+                <p className="form-small">UPI · Cards · Net banking · EMI on yearly. Demo: Razorpay connects in phase 2.</p>
+              </form>
+            ) : (
+              <div className="done">
+                <p className="form-head">Welcome to the family</p>
+                <div className="member-card">
+                  <p className="id-band">Muscle Paradise · Member</p>
+                  <div className="mc-body">
+                    <div className="mc-initials">
+                      {member.name
+                        .split(" ")
+                        .map((w) => w[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+                    <dl>
+                      <dt>Name</dt>
+                      <dd>{member.name}</dd>
+                      <dt>Member no.</dt>
+                      <dd>MP-{member.id}</dd>
+                      <dt>Plan</dt>
+                      <dd>{join.name}</dd>
+                      <dt>Valid till</dt>
+                      <dd>{member.till}</dd>
+                    </dl>
+                  </div>
+                  <div className="paid">Paid</div>
+                </div>
+                <p className="done-copy">
+                  Receipt and GST bill are on your WhatsApp. Just put your finger on the machine at the door — it already
+                  knows you.
+                </p>
+                <button className="btn big" onClick={() => setJoin(null)}>
+                  See you on the floor →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

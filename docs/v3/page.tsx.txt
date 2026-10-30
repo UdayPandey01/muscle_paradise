@@ -1,0 +1,659 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
+import Lenis from "lenis";
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+// Placeholder contact details — swap with the client's real ones.
+const PHONE = "919999999999";
+const ADDRESS = "Swaroop Nagar, Kanpur, Uttar Pradesh 208002";
+const MAPS = "https://maps.google.com/?q=Muscle+Paradise+Gym+Kanpur";
+const wa = (text: string) =>
+  `https://wa.me/${PHONE}?text=${encodeURIComponent(text)}`;
+
+// Plates loaded on each side of the hero bar, inside → out (Olympic colours).
+const loadout = [25, 20, 15, 10];
+
+const zones = [
+  { id: "weights", img: "weights", name: "Free weights", area: 1400, color: "red", spec: "Dumbbells from 2.5 to 50 kg on two full racks, so nobody waits for a pair." },
+  { id: "strength", img: "racks", name: "Strength", area: 1300, color: "blue", spec: "Four power racks, two deadlift platforms and calibrated plates. Chalk allowed." },
+  { id: "machines", img: "machines", name: "Machines", area: 1200, color: "yellow", spec: "Plate-loaded and pin-select machines for every muscle group." },
+  { id: "cardio", img: "cardio", name: "Cardio", area: 900, color: "green", spec: "Treadmills, bikes, rowers and a stair climber that humbles everyone." },
+  { id: "functional", img: "ropes", name: "Functional", area: 1200, color: "red", spec: "A turf lane with sleds, battle ropes and kettlebells." },
+];
+
+const records = [
+  { lift: "Deadlift", men: 260, menBy: "Vikram Y.", women: 140, womenBy: "Priya S.", unit: "kg" },
+  { lift: "Squat", men: 220, menBy: "Rahul K.", women: 115, womenBy: "Neha T.", unit: "kg" },
+  { lift: "Bench press", men: 160, menBy: "Imran A.", women: 70, womenBy: "Sana Q.", unit: "kg" },
+  { lift: "Strict pull-ups", men: 32, menBy: "Arjun M.", women: 14, womenBy: "Ritika P.", unit: "reps" },
+];
+
+const programs = [
+  { img: "ropes", name: "Fat loss", note: "Conditioning and a diet chart that fits Indian food", len: "12 weeks" },
+  { img: "curl", name: "Muscle gain", note: "Hypertrophy split, progress checked every week", len: "16 weeks" },
+  { img: "deadlift", name: "Powerlifting", note: "Squat, bench, deadlift. Meet prep if you want it", len: "Ongoing" },
+  { img: "trainer", name: "Personal training", note: "One coach, one plan, just you", len: "1 : 1" },
+  { img: "her-press", name: "Women's strength", note: "Led by our female coaches", len: "10 weeks" },
+  { img: "kettle", name: "Beginners & 40+", note: "Form first, ego never", len: "8 weeks" },
+];
+
+const coaches = [
+  { img: "coach1", name: "Vikram Yadav", role: "Head coach, powerlifting", yrs: 11 },
+  { img: "coach2", name: "Neha Tiwari", role: "Women's strength", yrs: 7 },
+  { img: "coach3", name: "Arjun Mishra", role: "Fat loss, conditioning", yrs: 6 },
+  { img: "coach4", name: "Sana Qureshi", role: "Mobility, rehab", yrs: 8 },
+];
+
+const stories = [
+  { stat: "−21 kg", who: "Rohit, 34, bank clerk", quote: "I joined after my BP report scared me. Eight months later my doctor asked what I'd changed." },
+  { stat: "+9 kg", who: "Aman, 22, student", quote: "Skinny my whole life. Coach didn't let me skip a single leg day. Hated him. Now I get it." },
+  { stat: "100 kg", who: "Priya, 29, teacher", quote: "First deadlift was the empty bar. Pulled a hundred last month and the whole floor clapped." },
+];
+
+// Each plan is a plate: longer commitment, heavier plate.
+const plans = [
+  { name: "Monthly", months: 1, kg: 10, color: "green", price: 1499, note: "Try us out" },
+  { name: "Quarterly", months: 3, kg: 15, color: "yellow", price: 3999, note: "Save ₹498" },
+  { name: "Half-yearly", months: 6, kg: 20, color: "blue", price: 6999, note: "Save ₹1,995" },
+  { name: "Yearly", months: 12, kg: 25, color: "red", price: 11999, note: "About ₹33 a day" },
+];
+
+// Typical members on the floor by hour (from biometric logs, once connected).
+const crowd = [0, 0, 0, 0, 0, 38, 62, 71, 55, 34, 22, 18, 15, 14, 16, 24, 41, 66, 74, 63, 45, 28, 12, 0];
+
+const inr = (n: number) => "₹" + n.toLocaleString("en-IN");
+
+export default function Home() {
+  const main = useRef<HTMLElement>(null);
+  const preview = useRef<HTMLDivElement>(null);
+  const total = useRef<HTMLSpanElement>(null);
+  const [now, setNow] = useState<Date | null>(null);
+  const [zone, setZone] = useState(0);
+  const [hovered, setHovered] = useState(-1);
+  const [join, setJoin] = useState<(typeof plans)[number] | null>(null);
+  const [memberId, setMemberId] = useState("");
+
+  useEffect(() => {
+    const update = () => setNow(new Date());
+    const t = setTimeout(update);
+    const id = setInterval(update, 30000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(id);
+    };
+  }, []);
+
+  const ist = now
+    ? new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }))
+    : null;
+  const hour = ist?.getHours() ?? 18;
+  const open = hour >= 5 && hour < 23;
+  const onFloor = crowd[hour];
+  const mood = !open ? "Closed" : onFloor < 25 ? "Quiet" : onFloor < 55 ? "Steady" : "Busy";
+
+  useGSAP(
+    () => {
+      const lenis = new Lenis();
+      lenis.on("scroll", ScrollTrigger.update);
+      const tick = (t: number) => lenis.raf(t * 1000);
+      gsap.ticker.add(tick);
+      gsap.ticker.lagSmoothing(0);
+
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        // Load the bar, one pair of plates at a time.
+        const tl = gsap.timeline({ delay: 0.3 });
+        tl.from(".bar", { scaleX: 0, duration: 0.9, ease: "power3.inOut" });
+        let kg = 20;
+        tl.call(() => {
+          if (total.current) total.current.textContent = "20";
+        }, [], 0);
+        loadout.forEach((p, i) => {
+          tl.from(
+            `.plate-${i}`,
+            { x: (_, el: HTMLElement) => (el.closest(".sleeve.left") ? -1 : 1) * window.innerWidth * 0.6, duration: 0.55, ease: "power4.in" },
+            i === 0 ? ">" : ">-0.1",
+          ).call(() => {
+            kg += p * 2;
+            if (total.current) total.current.textContent = String(kg);
+          });
+          tl.to(`.plate-${i}`, { x: (_, el: HTMLElement) => (el.closest(".sleeve.left") ? 3 : -3), duration: 0.06, yoyo: true, repeat: 1 });
+        });
+        tl.from(".hero-title .line > span", { yPercent: 105, duration: 1.2, ease: "expo.out", stagger: 0.08 }, 0.2);
+        tl.from(".hero-fade", { opacity: 0, y: 14, duration: 0.9, ease: "power3.out", stagger: 0.08 }, "-=0.4");
+
+        gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((el) =>
+          gsap.from(el, {
+            y: 48,
+            opacity: 0,
+            duration: 1.1,
+            ease: "power3.out",
+            scrollTrigger: { trigger: el, start: "top 90%" },
+          }),
+        );
+        gsap.utils.toArray<HTMLElement>("[data-clip]").forEach((el) =>
+          gsap.fromTo(
+            el,
+            { clipPath: "inset(0% 0% 100% 0%)" },
+            {
+              clipPath: "inset(0% 0% 0% 0%)",
+              duration: 1.4,
+              ease: "expo.inOut",
+              scrollTrigger: { trigger: el, start: "top 85%" },
+            },
+          ),
+        );
+        gsap.utils.toArray<HTMLElement>(".rec-bar i").forEach((el) =>
+          gsap.from(el, {
+            scaleX: 0,
+            transformOrigin: "left",
+            duration: 1.4,
+            ease: "expo.out",
+            scrollTrigger: { trigger: el, start: "top 92%" },
+          }),
+        );
+        gsap.from(".hour i", {
+          scaleY: 0,
+          transformOrigin: "bottom",
+          duration: 1,
+          ease: "expo.out",
+          stagger: 0.03,
+          scrollTrigger: { trigger: ".hours", start: "top 85%" },
+        });
+        gsap.from(".plan-plate", {
+          rotation: -120,
+          x: -80,
+          opacity: 0,
+          duration: 1.3,
+          ease: "expo.out",
+          stagger: 0.1,
+          scrollTrigger: { trigger: ".plates", start: "top 80%" },
+        });
+      });
+
+      mm.add("(min-width: 900px)", () => {
+        const x = gsap.quickTo(preview.current, "x", { duration: 0.5, ease: "power3" });
+        const y = gsap.quickTo(preview.current, "y", { duration: 0.5, ease: "power3" });
+        const move = (e: MouseEvent) => {
+          x(e.clientX);
+          y(e.clientY);
+        };
+        window.addEventListener("mousemove", move);
+        return () => window.removeEventListener("mousemove", move);
+      });
+
+      return () => {
+        gsap.ticker.remove(tick);
+        lenis.destroy();
+      };
+    },
+    { scope: main },
+  );
+
+  const z = zones[zone];
+
+  return (
+    <main ref={main}>
+      <nav className="nav">
+        <a href="#top" className="logo" aria-label="Muscle Paradise home">
+          <svg viewBox="0 0 40 16" aria-hidden>
+            <rect x="0" y="2" width="5" height="12" rx="1" fill="var(--red)" />
+            <rect x="6" y="4" width="3" height="8" rx="1" fill="var(--blue)" />
+            <rect x="9" y="7" width="22" height="2" fill="currentColor" />
+            <rect x="31" y="4" width="3" height="8" rx="1" fill="var(--blue)" />
+            <rect x="35" y="2" width="5" height="12" rx="1" fill="var(--red)" />
+          </svg>
+          Muscle Paradise
+        </a>
+        <div className="nav-links">
+          <a href="#floor">The floor</a>
+          <a href="#programs">Programs</a>
+          <a href="#coaches">Coaches</a>
+          <a href="#plans">Membership</a>
+        </div>
+        <div className="nav-right">
+          <span className="status">
+            <i className={open ? "on" : ""} />
+            {ist
+              ? `${open ? "Open now" : "Closed"} · ${ist.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`
+              : "Kanpur"}
+          </span>
+          <a href="#plans" className="btn">
+            Join
+          </a>
+        </div>
+      </nav>
+
+      {/* HERO — load the bar */}
+      <section className="hero" id="top">
+        <h1 className="hero-title">
+          <span className="line">
+            <span>Muscle Paradise</span>
+          </span>
+          <span className="line sub">
+            <span>Strength for everyone in Kanpur.</span>
+          </span>
+        </h1>
+
+        <div className="barbell" aria-hidden>
+          <div className="bar" />
+          <div className="sleeve left">
+            <b className="collar" />
+            {loadout.map((p, i) => (
+              <i key={p} className={`plate plate-${i} kg${p}`}>
+                <span>{p}</span>
+              </i>
+            ))}
+          </div>
+          <div className="sleeve right">
+            <b className="collar" />
+            {loadout.map((p, i) => (
+              <i key={p} className={`plate plate-${i} kg${p}`}>
+                <span>{p}</span>
+              </i>
+            ))}
+          </div>
+        </div>
+
+        <div className="hero-bottom">
+          <p className="hero-fade lede">
+            A unisex gym with heavy iron, coaches who actually watch your form, and a floor where everyone gets respect.
+          </p>
+          <p className="hero-fade loaded">
+            <span ref={total}>160</span> kg on the bar.
+            <br />
+            Your turn.
+          </p>
+          <a className="hero-fade btn big" href={wa("Hi! I'd like to book my free first session at Muscle Paradise.")}>
+            Book a free session
+          </a>
+        </div>
+      </section>
+
+      {/* INTRO */}
+      <section className="intro">
+        <p className="intro-text" data-reveal>
+          No juice bar. No mood lighting. Just <em className="c-red">6,000 sq ft</em> of iron, <em className="c-blue">nine coaches</em>{" "}
+          who learn your name, and a floor where the uncle doing his first push-up gets the same respect as the guy
+          pulling <em className="c-yellow">250</em>.
+        </p>
+        <div className="intro-photos">
+          <div className="ph" data-clip>
+            <Image src="/img/spot.jpg" alt="Lifter under a spotlight" fill sizes="(min-width: 900px) 33vw, 100vw" />
+          </div>
+          <div className="ph tall" data-clip>
+            <Image src="/img/her-press.jpg" alt="Woman pressing a barbell in the rack" fill sizes="(min-width: 900px) 33vw, 100vw" />
+          </div>
+          <div className="ph" data-clip>
+            <Image src="/img/grip.jpg" alt="Hand gripping a loaded barbell" fill sizes="(min-width: 900px) 33vw, 100vw" />
+          </div>
+        </div>
+      </section>
+
+      {/* FLOOR PLAN */}
+      <section className="floor" id="floor">
+        <div className="section-head">
+          <p className="eyebrow">
+            <i className="dot red" />
+            The floor
+          </p>
+          <h2 className="h2" data-reveal>
+            Here&apos;s the layout. Tap a zone.
+          </h2>
+        </div>
+        <div className="floor-grid">
+          <div className="plan" data-reveal>
+            {zones.map((zz, i) => (
+              <button
+                key={zz.id}
+                className={`zone-box ${zz.id} ${i === zone ? `on ${zz.color}` : ""}`}
+                onMouseEnter={() => setZone(i)}
+                onFocus={() => setZone(i)}
+                onClick={() => setZone(i)}
+              >
+                <span>{zz.name}</span>
+                <small>{zz.area.toLocaleString("en-IN")} sq ft</small>
+              </button>
+            ))}
+            <span className="entry">Entry · fingerprint door</span>
+          </div>
+          <div className="zone-detail" data-reveal>
+            <div className="zone-img">
+              {zones.map((zz, i) => (
+                <Image key={zz.id} src={`/img/${zz.img}.jpg`} alt={zz.name} fill sizes="(min-width: 900px) 45vw, 100vw" className={i === zone ? "on" : ""} />
+              ))}
+            </div>
+            <h3>{z.name}</h3>
+            <p>{z.spec}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* RECORDS BOARD */}
+      <section className="records">
+        <div className="section-head">
+          <p className="eyebrow">
+            <i className="dot blue" />
+            Gym records
+          </p>
+          <h2 className="h2" data-reveal>
+            Beat one and your name goes on the wall.
+          </h2>
+        </div>
+        <div className="rec-table">
+          <div className="rec-row rec-headrow">
+            <span>Lift</span>
+            <span>Men</span>
+            <span>Women</span>
+          </div>
+          {records.map((r) => (
+            <div className="rec-row" key={r.lift} data-reveal>
+              <span className="rec-lift">{r.lift}</span>
+              {[
+                { v: r.men, by: r.menBy, max: records[0].men },
+                { v: r.women, by: r.womenBy, max: records[0].men },
+              ].map((x, i) => (
+                <span className="rec-cell" key={i}>
+                  <b>
+                    {x.v}
+                    <small> {r.unit}</small>
+                  </b>
+                  <span className="rec-by">{x.by}</span>
+                  <span className="rec-bar">
+                    <i className={i ? "yellow" : "red"} style={{ width: `${(x.v / (r.unit === "reps" ? 32 : x.max)) * 100}%` }} />
+                  </span>
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PROGRAMS */}
+      <section className="programs" id="programs">
+        <div className="section-head">
+          <p className="eyebrow">
+            <i className="dot yellow" />
+            Programs
+          </p>
+          <h2 className="h2" data-reveal>
+            Pick a goal. We&apos;ll write the plan.
+          </h2>
+        </div>
+        <ul className="program-list" onMouseLeave={() => setHovered(-1)}>
+          {programs.map((p, i) => (
+            <li key={p.name} onMouseEnter={() => setHovered(i)}>
+              <h3>{p.name}</h3>
+              <p>{p.note}</p>
+              <span className="len">{p.len}</span>
+              <a href={wa(`Hi! I'm interested in the ${p.name} program.`)} aria-label={`Ask about ${p.name}`}>
+                Ask
+              </a>
+            </li>
+          ))}
+        </ul>
+        <div className={`preview ${hovered >= 0 ? "show" : ""}`} ref={preview} aria-hidden>
+          {programs.map((p, i) => (
+            <Image key={p.name} src={`/img/${p.img}.jpg`} alt="" fill sizes="300px" className={i === hovered ? "on" : ""} />
+          ))}
+        </div>
+      </section>
+
+      {/* WOMEN */}
+      <section className="her">
+        <div className="her-img" data-clip>
+          <Image src="/img/her-squat.jpg" alt="Woman squatting a loaded barbell" fill sizes="(min-width: 900px) 50vw, 100vw" />
+        </div>
+        <div className="her-copy">
+          <p className="eyebrow">
+            <i className="dot green" />
+            For women
+          </p>
+          <h2 className="h2" data-reveal>
+            Unisex shouldn&apos;t mean an afterthought.
+          </h2>
+          <ul>
+            {[
+              ["Female coaches", "on every shift, morning and evening"],
+              ["Separate changing rooms", "with lockers"],
+              ["Women-only hour", "11 AM to 12 PM, every day"],
+              ["CCTV on the floor", "never in the rooms"],
+              ["Zero tolerance", "for harassment, actually enforced"],
+            ].map(([a, b]) => (
+              <li key={a} data-reveal>
+                <b>{a}</b> {b}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* COACHES */}
+      <section className="coaches" id="coaches">
+        <div className="section-head">
+          <p className="eyebrow">
+            <i className="dot red" />
+            Coaches
+          </p>
+          <h2 className="h2" data-reveal>
+            They&apos;ll know your name by day two.
+          </h2>
+        </div>
+        <div className="coach-grid">
+          {coaches.map((c) => (
+            <article className="coach" key={c.name} data-reveal>
+              <div className="coach-img">
+                <Image src={`/img/${c.img}.jpg`} alt={c.name} fill sizes="(min-width: 900px) 25vw, 50vw" />
+              </div>
+              <h3>{c.name}</h3>
+              <p>
+                {c.role} · {c.yrs} years
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* STORIES */}
+      <section className="stories">
+        <div className="story-grid">
+          {stories.map((s, i) => (
+            <figure className="story" key={s.who} data-reveal>
+              <p className={`stat c-${["red", "blue", "yellow"][i]}`}>{s.stat}</p>
+              <blockquote>“{s.quote}”</blockquote>
+              <figcaption>{s.who}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      {/* LIVE */}
+      <section className="live">
+        <div className="live-head">
+          <p className="eyebrow">
+            <i className={`dot ${open ? "green" : "red"}`} />
+            Right now · from the fingerprint door <span className="tag">preview</span>
+          </p>
+          <p className="live-num">
+            {open ? onFloor : 0}
+            <span>{mood}</span>
+          </p>
+          <p className="live-copy">
+            {open
+              ? `people on the floor at ${hour}:00. ${mood === "Quiet" ? "Perfect time for squats." : mood === "Steady" ? "Racks are free, go lift." : "Peak hour. Expect to share."}`
+              : "We open at 5 AM. Early birds get the racks."}
+          </p>
+        </div>
+        <div className="hours" aria-label="Typical crowd by hour">
+          {crowd.slice(5, 23).map((c, i) => (
+            <div key={i} className={`hour ${i + 5 === hour ? "now" : ""}`}>
+              <i style={{ height: `${(c / 80) * 100}%` }} />
+              <span>{i + 5}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PLANS — plates */}
+      <section className="plans" id="plans">
+        <div className="section-head">
+          <p className="eyebrow">
+            <i className="dot red" />
+            Membership
+          </p>
+          <h2 className="h2" data-reveal>
+            Pick your plate. Heavier saves more.
+          </h2>
+        </div>
+        <div className="plates">
+          {plans.map((p) => (
+            <div className="plan-col" key={p.name}>
+              <button
+                className={`plan-plate ${p.color}`}
+                style={{ width: `${60 + p.kg * 1.6}%` }}
+                onClick={() => {
+                  setMemberId("");
+                  setJoin(p);
+                }}
+                aria-label={`Join ${p.name} for ${inr(p.price)}`}
+              >
+                <span className="pp-kg">{p.kg}</span>
+                <span className="pp-hole" />
+                <span className="pp-label">{p.months === 1 ? "1 month" : `${p.months} months`}</span>
+              </button>
+              <h3>{p.name}</h3>
+              <p className="price">{inr(p.price)}</p>
+              <p className="plan-note">{p.note}</p>
+              <button
+                className={`btn ${p.months === 12 ? "red" : "ghost"}`}
+                onClick={() => {
+                  setMemberId("");
+                  setJoin(p);
+                }}
+              >
+                Join {p.name.toLowerCase()}
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className="addons" data-reveal>
+          Personal training ₹4,000 a month · Couples save 15% · Students save 10% with ID · GST invoice with every payment
+        </p>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        <div className="footer-cta">
+          <h2>Come lift.</h2>
+          <div className="footer-links">
+            <a className="btn big" href={wa("Hi! I'd like to visit Muscle Paradise.")}>
+              WhatsApp us
+            </a>
+            <a className="btn big ghost" href={MAPS} target="_blank" rel="noreferrer">
+              Get directions
+            </a>
+          </div>
+        </div>
+        <div className="footer-info">
+          <div>
+            <p className="eyebrow">Find us</p>
+            <p>{ADDRESS}</p>
+          </div>
+          <div>
+            <p className="eyebrow">Hours</p>
+            <p>
+              Mon to Sat, 5 AM to 11 PM
+              <br />
+              Sunday, 6 AM to 12 PM
+            </p>
+          </div>
+          <div>
+            <p className="eyebrow">Talk</p>
+            <p>
+              <a href={`tel:+${PHONE}`}>+91 99999 99999</a>
+              <br />
+              <a href="https://instagram.com" target="_blank" rel="noreferrer">
+                Instagram
+              </a>
+            </p>
+          </div>
+        </div>
+        <div className="footer-bar" aria-hidden>
+          {["red", "blue", "yellow", "green"].map((c) => (
+            <i key={c} className={c} />
+          ))}
+        </div>
+        <div className="footer-base">
+          <span>© {ist?.getFullYear()} Muscle Paradise, Kanpur</span>
+          <a href="#top">Back to top</a>
+        </div>
+      </footer>
+
+      <a className="wa-float" href={wa("Hi Muscle Paradise!")} aria-label="Chat on WhatsApp">
+        <svg viewBox="0 0 24 24" aria-hidden>
+          <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.8-1.1-4.6-4-4.8-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.3 0 .5l-.3.5-.4.5c-.1.1-.3.3-.1.6.2.3.7 1.2 1.6 1.9 1.1 1 2 1.3 2.3 1.4.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3.1.2.1.7-.1 1.4Z" />
+        </svg>
+      </a>
+
+      {/* JOIN SHEET */}
+      {join && (
+        <div className="sheet-bg" onClick={() => setJoin(null)} data-lenis-prevent>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal aria-label="Join">
+            <button className="close" onClick={() => setJoin(null)}>
+              Close
+            </button>
+            {!memberId ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setMemberId("MP-" + Math.floor(1000 + Math.random() * 9000));
+                }}
+              >
+                <div className={`sheet-plate ${join.color}`}>{join.kg}</div>
+                <p className="eyebrow">You picked</p>
+                <h3>
+                  {join.name} · {inr(join.price)}
+                </h3>
+                <label>
+                  <span>Full name</span>
+                  <input required name="name" autoComplete="name" />
+                </label>
+                <label>
+                  <span>Mobile</span>
+                  <input required name="phone" type="tel" inputMode="numeric" pattern="[6-9][0-9]{9}" placeholder="10-digit number" />
+                </label>
+                <label>
+                  <span>Start date</span>
+                  <input required name="start" type="date" />
+                </label>
+                <button className="btn big red" type="submit">
+                  Pay {inr(join.price)} with UPI
+                </button>
+                <p className="small">UPI, cards, net banking, EMI on yearly. Demo only: Razorpay connects in phase 2.</p>
+              </form>
+            ) : (
+              <div className="done">
+                <div className={`sheet-plate ${join.color} spin`}>{join.kg}</div>
+                <p className="eyebrow">Payment received</p>
+                <h3>You&apos;re in.</h3>
+                <p>
+                  Membership <b>{memberId}</b> is active. Your receipt and GST invoice are on WhatsApp. Put your finger on
+                  the scanner at the door. It already knows you.
+                </p>
+                <button className="btn big" onClick={() => setJoin(null)}>
+                  See you on the floor
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
