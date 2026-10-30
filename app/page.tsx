@@ -34,6 +34,12 @@ const flashes = [
   "/video/her.jpg",
 ];
 
+// Kettlebell outline in a 240 x 300 box: round bell with a flat base, handle horns, and the handle window.
+// Bell centre is (120, 186). evenodd cuts the window out of the handle.
+const KETTLEBELL =
+  "M70.5 282 H169.5 A108 108 0 0 0 196.7 110 C210 90 214 62 208 42 C200 12 170 6 120 6 C70 6 40 12 32 42 C26 62 30 90 43.3 110 A108 108 0 0 0 70.5 282 Z " +
+  "M66 96 C62 64 82 40 120 40 C158 40 178 64 174 96 C160 82 142 74 120 74 C98 74 80 82 66 96 Z";
+
 // Horizontal tour of the building. video = clip in /public/video, img = photo in /public/photos.
 const zones = [
   { video: "battle", level: "Ground floor", name: "Cardio", spec: "Walk in and warm up. Treadmills, bikes and cross-trainers right at the entrance." },
@@ -212,15 +218,20 @@ export default function Home() {
         // then the kettlebell rushes at you until the video fills the screen.
         lenis.stop();
         // The kettlebell is drawn in a 240-wide box; its bell centre is (120, 186).
-        const shape = document.querySelector(".kb-shape")!;
-        const kb = { size: 0 };
+        const shapes = document.querySelectorAll(".kb-shape");
+        const kb = { size: 0, y: 0, r: 0 };
         const place = () =>
-          shape.setAttribute(
-            "transform",
-            `translate(${innerWidth / 2} ${innerHeight / 2}) scale(${kb.size / 240}) translate(-120 -186)`,
+          shapes.forEach((el) =>
+            el.setAttribute(
+              "transform",
+              `translate(${innerWidth / 2} ${innerHeight / 2 + kb.y}) rotate(${kb.r}) scale(${kb.size / 240}) translate(-120 -186)`,
+            ),
           );
+        const small = Math.min(innerWidth * 0.6, innerHeight * 0.46, 380);
+        kb.size = small;
+        kb.y = -innerHeight;
+        kb.r = -14;
         place();
-        const small = Math.min(innerWidth * 0.5, innerHeight * 0.38, 320);
         const big = Math.max(innerWidth, innerHeight) * 4;
         const counter = { v: 0 };
         const countEl = document.querySelector(".loader-count");
@@ -232,7 +243,12 @@ export default function Home() {
           },
         });
         intro
-          .to(kb, { size: small, duration: 1, ease: "back.out(1.7)", onUpdate: place }, 0.15)
+          // drop it in like it was let go from overhead, then a heavy landing
+          .to(kb, { y: 0, duration: 0.85, ease: "bounce.out", onUpdate: place }, 0.1)
+          .to(kb, { r: 0, duration: 1.1, ease: "elastic.out(1, 0.35)", onUpdate: place }, 0.35)
+          .fromTo(".hero", { y: 0 }, { y: 7, duration: 0.05, yoyo: true, repeat: 3, ease: "none" }, 0.62)
+          // slow spin of the ring lettering while it rests
+          .fromTo(".kb-ring-text", { attr: { "letter-spacing": 6 } }, { attr: { "letter-spacing": 3.2 }, duration: 2, ease: "power2.out" }, 0.4)
           .to(
             counter,
             {
@@ -250,6 +266,7 @@ export default function Home() {
         intro
           .set(".flash", { autoAlpha: 0 }, 2.75)
           .to(".loader-inner", { opacity: 0, y: 20, duration: 0.5, ease: "power2.in" }, 2.7)
+          .to(".kb-overlay", { opacity: 0, duration: 0.35 }, 2.75)
           .to(kb, { size: big, duration: 1.3, ease: "power4.in", onUpdate: place }, 2.75)
           .set(".curtain", { autoAlpha: 0 }, 4.05)
           .set(".loader", { autoAlpha: 0 }, 4.05)
@@ -413,16 +430,22 @@ export default function Home() {
             <mask id="kb-hole">
               <rect width="100%" height="100%" fill="#fff" />
               <g className="kb-shape">
-                <path
-                  fill="#000"
-                  fillRule="evenodd"
-                  d="M28 140 V78 C28 38 56 14 96 14 H144 C184 14 212 38 212 78 V140 Z M66 120 V84 C66 60 80 48 104 48 H136 C160 48 174 60 174 84 V120 Z"
-                />
-                <circle cx="120" cy="186" r="108" fill="#000" />
+                <path fill="#000" fillRule="evenodd" d={KETTLEBELL} />
               </g>
             </mask>
           </defs>
           <rect width="100%" height="100%" fill="#0b0b0a" mask="url(#kb-hole)" />
+          {/* The iron itself: rim, base and the sign's ring lettering, moving with the window. */}
+          <g className="kb-shape kb-overlay">
+            <path id="kb-ring" d="M33.5 154.5 A92 92 0 1 0 206.5 154.5" fill="none" />
+            <path d={KETTLEBELL} fill="none" fillRule="evenodd" stroke="#f5a524" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
+            <path d="M58 290 H182" stroke="#f5a524" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
+            <text className="kb-ring-text" textAnchor="middle">
+              <textPath href="#kb-ring" startOffset="50%">
+                THE MUSCLE PARADISE · DATE THE WEIGHT
+              </textPath>
+            </text>
+          </g>
         </svg>
         <div className="hero-content">
           <div className="hero-meta hero-fade mono">

@@ -331,6 +331,13 @@ section {
   pointer-events: none;
 }
 
+.kb-ring-text {
+  fill: #f5a524;
+  font-family: var(--font-mono), monospace;
+  font-size: 9px;
+  font-weight: 500;
+}
+
 .hero-content {
   position: absolute;
   inset: 0;
